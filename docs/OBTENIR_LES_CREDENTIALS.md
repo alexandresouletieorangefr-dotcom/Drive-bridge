@@ -78,15 +78,17 @@ Un compte de service ne voit **rien** tant que vous ne l'avez pas partage.
 1. Relevez son adresse e-mail, page du compte de service →
    `digen-drive-bot@<projet>.iam.gserviceaccount.com`
    (le suffixe exact est affiche dans le champ **Adresse e-mail**)
-2. Dans Google Drive : ouvrir **chaque dossier d'assets**
+2. Dans Google Drive : ouvrir le **dossier racine** qui contient vos assets
    → **Partager → Ajouter des personnes**
    → coller l'adresse du compte de service
    → role **Lecteur** ou **Gestionnaire** → **Envoyer**
 3. L'avertissement « Impossible d'envoyer a des comptes Google » est **normal**
    (le compte de service n'a pas d'interface) — partagez quand meme.
 
-> ⚠️ **Le partage d'un dossier NE se transmet pas a ses sous-dossiers.**
-> Partagez chaque dossier qui contient directement des assets.
+> ✅ **Le partage se propage.** Selon Google : « Les autorisations d'un dossier
+> parent sont heritees par tous les fichiers et dossiers qu'il contient. »
+> Partager le dossier racine suffit donc : les sous-dossiers et leurs fichiers
+> sont couverts automatiquement. Inutile de partager chaque sous-dossier.
 
 ### B4. Transmettre
 
