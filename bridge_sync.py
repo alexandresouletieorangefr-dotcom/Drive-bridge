@@ -19,7 +19,8 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google.oauth2.service_account import Credentials as SACredentials
 from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
+from googleapiclient.errors import HttpError 
+from googleapiclient.http import MediaIoBaseDownload
 
 HOME = Path(os.environ.get("GDRIVE_HOME", Path.home() / ".gdrive-bridge"))
 SCOPES = ["https://www.googleapis.com/auth/drive"]
