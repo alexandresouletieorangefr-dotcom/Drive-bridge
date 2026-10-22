@@ -56,7 +56,7 @@ jobs:
           TOKEN: ${{ secrets.GDRIVE_TOKEN_JSON }}
         run: |
           set -euo pipefail
-          mkdir -p "$GDRIVE_HOME"
+          mkdir -p "$GDRIVE_HOME" assets
           chmod 700 "$GDRIVE_HOME"
           if [ -n "${SA:-}" ]; then
             printf '%s' "$SA" > "$GDRIVE_HOME/service_account.json"
@@ -85,6 +85,7 @@ jobs:
         with:
           path: assets
           key: assets-${{ github.run_id }}
+          if-no-files-found: ignore
 
       - name: Publier la release
         env:
