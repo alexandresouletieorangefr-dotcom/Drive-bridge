@@ -1,0 +1,7 @@
+assets/
+manifest.json
+.gdrive-bridge/
+credentials.json
+token.json
+service_account.json
+*.key

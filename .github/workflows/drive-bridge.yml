@@ -1,0 +1,93 @@
+name: Drive Bridge
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag de la release (vide = auto, ex. assets-20261022-1600)'
+        required: false
+        default: ''
+  schedule:
+    # toutes les 2 h, decalage pour eviter les pointes
+    - cron: '23 */2 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: drive-bridge
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: Miroir Drive
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GDRIVE_HOME: /home/runner/.gdrive-bridge
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Restaurer le cache des assets
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: assets
+          key: assets-${{ github.run_id }}
+          restore-keys: |
+            assets-
+
+      - name: Installer les dependances
+        run: |
+          pip install --quiet --upgrade pip
+          pip install --quiet -r requirements.txt
+
+      - name: Configurer les identifiants
+        env:
+          SA: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+          CLIENT: ${{ secrets.GDRIVE_CLIENT_JSON }}
+          TOKEN: ${{ secrets.GDRIVE_TOKEN_JSON }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$GDRIVE_HOME"
+          chmod 700 "$GDRIVE_HOME"
+          if [ -n "${SA:-}" ]; then
+            printf '%s' "$SA" > "$GDRIVE_HOME/service_account.json"
+            echo "GDRIVE_MODE=service" >> "$GITHUB_ENV"
+            echo "Mode : compte de service (cle JSON, n'expire jamais)"
+          elif [ -n "${TOKEN:-}" ]; then
+            printf '%s' "$CLIENT" > "$GDRIVE_HOME/credentials.json"
+            printf '%s' "$TOKEN" > "$GDRIVE_HOME/token.json"
+            echo "GDRIVE_MODE=oauth" >> "$GITHUB_ENV"
+            echo "Mode : OAuth refresh token (renouvele en silence)"
+          else
+            echo "::error::Aucun secret Google Drive configure (GDRIVE_SERVICE_ACCOUNT_JSON, ou GDRIVE_CLIENT_JSON + GDRIVE_TOKEN_JSON)."
+            exit 1
+          fi
+          chmod 600 "$GDRIVE_HOME"/*.json
+
+      - name: Diagnostic de la connexion
+        run: python bridge_sync.py --doctor
+
+      - name: Miroir Drive
+        run: python bridge_sync.py --sync
+
+      - name: Sauvegarder le cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: assets
+          key: assets-${{ github.run_id }}
+
+      - name: Publier la release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: python publish_release.py "$TAG"
