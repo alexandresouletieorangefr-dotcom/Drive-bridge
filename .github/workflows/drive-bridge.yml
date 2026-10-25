@@ -1,3 +1,4 @@
+
 name: Drive Bridge
 
 on:
@@ -8,7 +9,7 @@ on:
         required: false
         default: ''
   schedule:
-    # toutes les 2 h, decalage pour eviter les pointes
+    # toutes les 2 h, décalage pour éviter les pointes
     - cron: '23 */2 * * *'
 
 permissions:
@@ -25,6 +26,7 @@ jobs:
     timeout-minutes: 60
     env:
       GDRIVE_HOME: /home/runner/.gdrive-bridge
+      BRIDGE_TAG: ${{ inputs.tag }}
 
     steps:
       - name: Checkout
@@ -36,7 +38,6 @@ jobs:
           python-version: '3.11'
 
       - name: Restaurer le cache des assets
-        id: cache
         uses: actions/cache/restore@v4
         with:
           path: assets
@@ -44,7 +45,7 @@ jobs:
           restore-keys: |
             assets-
 
-      - name: Installer les dependances
+      - name: Installer les dépendances
         run: |
           pip install --quiet --upgrade pip
           pip install --quiet -r requirements.txt
@@ -61,14 +62,14 @@ jobs:
           if [ -n "${SA:-}" ]; then
             printf '%s' "$SA" > "$GDRIVE_HOME/service_account.json"
             echo "GDRIVE_MODE=service" >> "$GITHUB_ENV"
-            echo "Mode : compte de service (cle JSON, n'expire jamais)"
-          elif [ -n "${TOKEN:-}" ]; then
+            echo "Mode : compte de service"
+          elif [ -n "${TOKEN:-}" ] && [ -n "${CLIENT:-}" ]; then
             printf '%s' "$CLIENT" > "$GDRIVE_HOME/credentials.json"
             printf '%s' "$TOKEN" > "$GDRIVE_HOME/token.json"
             echo "GDRIVE_MODE=oauth" >> "$GITHUB_ENV"
-            echo "Mode : OAuth refresh token (renouvele en silence)"
+            echo "Mode : OAuth refresh token"
           else
-            echo "::error::Aucun secret Google Drive configure (GDRIVE_SERVICE_ACCOUNT_JSON, ou GDRIVE_CLIENT_JSON + GDRIVE_TOKEN_JSON)."
+            echo "::error::Aucun secret Google Drive valide (GDRIVE_SERVICE_ACCOUNT_JSON, ou GDRIVE_CLIENT_JSON + GDRIVE_TOKEN_JSON)."
             exit 1
           fi
           chmod 600 "$GDRIVE_HOME"/*.json
@@ -79,28 +80,29 @@ jobs:
       - name: Miroir Drive
         run: python bridge_sync.py --sync
 
+      - name: Vérifier que assets n'est pas vide
+        run: |
+          if [ -z "$(ls -A assets 2>/dev/null)" ]; then
+            echo "::error::Le dossier assets est vide, synchronisation R2 annulée."
+            exit 1
+          fi
+
+      - name: Installer rclone
+        run: curl -fsSL https://rclone.org/install.sh | sudo bash
+
+      - name: Sync to R2
+        env:
+          RCLONE_CONFIG_R2_TYPE: s3
+          RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+          RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          RCLONE_CONFIG_R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true"
+        run: rclone sync ./assets r2:diegenasset --checksum --transfers 8 --stats-one-line -v
+
       - name: Sauvegarder le cache
         if: always()
         uses: actions/cache/save@v4
         with:
           path: assets
           key: assets-${{ github.run_id }}
-          if-no-files-found: ignore
-       - name: Sync to R2
-        env:
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        run: |
-          curl https://rclone.org/install.sh | sudo bash
-          rclone config create r2 s3 \
-            provider Cloudflare \
-            access_key_id $R2_ACCESS_KEY_ID \
-            secret_access_key $R2_SECRET_ACCESS_KEY \
-            endpoint $R2_ENDPOINT \
-            acl public-read
-          rclone sync ./assets r2:diegenasset --progress --checksum
-
-                
-
- 
