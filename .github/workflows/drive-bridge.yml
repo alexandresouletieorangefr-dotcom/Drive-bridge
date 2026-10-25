@@ -86,7 +86,7 @@ jobs:
           path: assets
           key: assets-${{ github.run_id }}
           if-no-files-found: ignore
-  - name: Sync to R2
+                - name: Sync to R2
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -101,8 +101,4 @@ jobs:
             acl public-read
           rclone sync ./assets r2:diegenasset --progress --checksum
 
-      - name: Publier la release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ inputs.tag }}
-        run: python publish_release.py "$TAG"
+ 
