@@ -86,7 +86,7 @@ jobs:
           path: assets
           key: assets-${{ github.run_id }}
           if-no-files-found: ignore
-                - name: Sync to R2
+       - name: Sync to R2
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -100,5 +100,7 @@ jobs:
             endpoint $R2_ENDPOINT \
             acl public-read
           rclone sync ./assets r2:diegenasset --progress --checksum
+
+                
 
  
