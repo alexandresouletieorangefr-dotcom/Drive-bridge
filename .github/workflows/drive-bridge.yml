@@ -86,6 +86,20 @@ jobs:
           path: assets
           key: assets-${{ github.run_id }}
           if-no-files-found: ignore
+  - name: Sync to R2
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: |
+          curl https://rclone.org/install.sh | sudo bash
+          rclone config create r2 s3 \
+            provider Cloudflare \
+            access_key_id $R2_ACCESS_KEY_ID \
+            secret_access_key $R2_SECRET_ACCESS_KEY \
+            endpoint $R2_ENDPOINT \
+            acl public-read
+          rclone sync ./assets r2:diegenasset --progress --checksum
 
       - name: Publier la release
         env:
