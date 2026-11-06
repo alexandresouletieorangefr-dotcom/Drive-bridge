@@ -109,6 +109,10 @@ def sync(svc, mode, out_root):
     }
 
     downloaded = skipped = failed = 0
+    import shutil
+    if out_root.exists():
+        shutil.rmtree(out_root)
+    out_root.mkdir(parents=True, exist_ok=True)
     for f in files:
         parents = f.get("parents") or []
         parent = parents[0] if parents else ""
