@@ -120,14 +120,41 @@ def sync(svc, mode, out_root):
         asset_name = f"{safe(folder)}__{safe(fname)}"
         size = int(f.get("size") or 0)
 
-        if size > MAX_MB * 1024 * 1024:
+                if size > MAX_MB * 1024 * 1024:
             log(f"! ignore (trop gros, {size // 1024 // 1024} Mo) : {fname}")
             failed += 1
             continue
 
-        if target.exists() and (size == 0 or target.stat().st_size == size):
+        # Re-télécharge si le fichier a changé (taille ou date de modification)
+        modified = f.get("modifiedTime", "")
+        should_skip = False
+        if target.exists() and size > 0 and target.stat().st_size == size:
+            if modified:
+                local_mtime = datetime.datetime.fromtimestamp(
+                    target.stat().st_mtime, tz=datetime.timezone.utc
+                ).isoformat()
+                if modified <= local_mtime:
+                    should_skip = True
+            else:
+                should_skip = True
+
+        if should_skip:
             skipped += 1
         else:
+            try:
+                buf = BytesIO()
+                dl = MediaIoBaseDownload(
+                    buf, svc.files().get_media(fileId=f["id"], supportsAllDrives=True)
+                )
+                done = False
+                while not done:
+                    _, done = dl.next_chunk()
+                target.write_bytes(buf.getvalue())
+                downloaded += 1
+            except HttpError as exc:
+                log(f"! echec {fname} : {exc}")
+                failed += 1
+                continue
             try:
                 buf = BytesIO()
                 dl = MediaIoBaseDownload(
