@@ -11,6 +11,7 @@ import datetime
 import json
 import os
 import re
+import shutil
 import sys
 from io import BytesIO
 from pathlib import Path
@@ -19,7 +20,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google.oauth2.service_account import Credentials as SACredentials
 from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError 
+from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload
 
 HOME = Path(os.environ.get("GDRIVE_HOME", Path.home() / ".gdrive-bridge"))
@@ -87,6 +88,9 @@ def doctor(svc, mode):
 
 
 def sync(svc, mode, out_root):
+    # Force : on vide complètement le dossier assets avant de tout re-télécharger
+    if out_root.exists():
+        shutil.rmtree(out_root)
     out_root.mkdir(parents=True, exist_ok=True)
 
     folders = {
@@ -109,10 +113,7 @@ def sync(svc, mode, out_root):
     }
 
     downloaded = skipped = failed = 0
-    import shutil
-    if out_root.exists():
-        shutil.rmtree(out_root)
-    out_root.mkdir(parents=True, exist_ok=True)
+
     for f in files:
         parents = f.get("parents") or []
         parent = parents[0] if parents else ""
@@ -124,55 +125,26 @@ def sync(svc, mode, out_root):
         asset_name = f"{safe(folder)}__{safe(fname)}"
         size = int(f.get("size") or 0)
 
-                if size > MAX_MB * 1024 * 1024:
+        if size > MAX_MB * 1024 * 1024:
             log(f"! ignore (trop gros, {size // 1024 // 1024} Mo) : {fname}")
             failed += 1
             continue
 
-        # Re-télécharge si le fichier a changé (taille ou date de modification)
-        modified = f.get("modifiedTime", "")
-        should_skip = False
-        if target.exists() and size > 0 and target.stat().st_size == size:
-            if modified:
-                local_mtime = datetime.datetime.fromtimestamp(
-                    target.stat().st_mtime, tz=datetime.timezone.utc
-                ).isoformat()
-                if modified <= local_mtime:
-                    should_skip = True
-            else:
-                should_skip = True
-
-        if should_skip:
-            skipped += 1
-        else:
-            try:
-                buf = BytesIO()
-                dl = MediaIoBaseDownload(
-                    buf, svc.files().get_media(fileId=f["id"], supportsAllDrives=True)
-                )
-                done = False
-                while not done:
-                    _, done = dl.next_chunk()
-                target.write_bytes(buf.getvalue())
-                downloaded += 1
-            except HttpError as exc:
-                log(f"! echec {fname} : {exc}")
-                failed += 1
-                continue
-            try:
-                buf = BytesIO()
-                dl = MediaIoBaseDownload(
-                    buf, svc.files().get_media(fileId=f["id"], supportsAllDrives=True)
-                )
-                done = False
-                while not done:
-                    _, done = dl.next_chunk()
-                target.write_bytes(buf.getvalue())
-                downloaded += 1
-            except HttpError as exc:
-                log(f"! echec {fname} : {exc}")
-                failed += 1
-                continue
+        # On télécharge toujours (le dossier a été vidé)
+        try:
+            buf = BytesIO()
+            dl = MediaIoBaseDownload(
+                buf, svc.files().get_media(fileId=f["id"], supportsAllDrives=True)
+            )
+            done = False
+            while not done:
+                _, done = dl.next_chunk()
+            target.write_bytes(buf.getvalue())
+            downloaded += 1
+        except HttpError as exc:
+            log(f"! echec {fname} : {exc}")
+            failed += 1
+            continue
 
         entry = {
             "asset": asset_name,
